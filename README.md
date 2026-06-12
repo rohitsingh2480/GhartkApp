@@ -37,5 +37,6 @@ Backend runs at: **http://localhost:8080/api**
 - JPA/Hibernate + MySQL
 - Lombok + Validation
 
+
 ---
 
