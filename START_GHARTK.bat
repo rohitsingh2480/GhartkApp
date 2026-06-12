@@ -9,7 +9,6 @@ echo     Database: ghartk_db
 echo     Username: root
 echo     Password: root
 echo.
-echo [2] Opening Frontend at http://localhost:3000
 echo [3] Backend API at http://localhost:8080/api
 echo.
 
