@@ -13,6 +13,4 @@ echo [2] Opening Frontend at http://localhost:3000
 echo [3] Backend API at http://localhost:8080/api
 echo.
 
-start "GHARTK Frontend" cmd /k "cd /d %~dp0ghartk-frontend && npm run dev"
-
 
