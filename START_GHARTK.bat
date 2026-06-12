@@ -15,19 +15,4 @@ echo.
 
 start "GHARTK Frontend" cmd /k "cd /d %~dp0ghartk-frontend && npm run dev"
 
-echo.
-echo ============================================
-echo  ADMIN CREDENTIALS:
-echo    Email:    admin@ghartk.com
-echo    Password: Admin@123
-echo.
-echo  CUSTOMER CREDENTIALS:
-echo    Email:    rahul@gmail.com
-echo    Password: Admin@123
-echo ============================================
-echo.
-echo To start backend, open a NEW terminal and run:
-echo   cd ghartk-backend
-echo   mvn spring-boot:run
-echo.
-pause
+
