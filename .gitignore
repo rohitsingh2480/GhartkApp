@@ -7,10 +7,7 @@
 *.sln
 *.sw?
 
-# Build & Dependency Directories
-ghartk-backend/target/
-ghartk-frontend/dist/
-ghartk-frontend/node_modules/
+
 
 # Local reference backups (daily progress folders)
 Day_*/
