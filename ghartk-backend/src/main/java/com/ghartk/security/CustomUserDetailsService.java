@@ -1,6 +1,5 @@
 package com.ghartk.security;
 
-
 import com.ghartk.entity.User;
 import com.ghartk.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
