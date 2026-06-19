@@ -1,5 +1,6 @@
 package com.ghartk.entity;
 
+
 import jakarta.persistence.*;
 import lombok.*;
 
