@@ -64,36 +64,6 @@ public class OrderService {
         return mapToResponse(saved);
     }
 
-    public Page<OrderResponse> getMyOrders(String emailOrPhone, int page, int size) {
-        User user = userService.getUserEntity(emailOrPhone);
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        return orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable).map(this::mapToResponse);
-    }
 
-    public OrderResponse getMyOrder(String emailOrPhone, Long orderId) {
-        User user = userService.getUserEntity(emailOrPhone);
-        Order order = orderRepository.findByIdAndUserId(orderId, user.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
-        return mapToResponse(order);
-    }
-
-    public OrderResponse mapToResponse(Order order) {
-        List<OrderItemResponse> items = order.getItems().stream().map(item ->
-                OrderItemResponse.builder().id(item.getId())
-                        .productId(item.getProduct() != null ? item.getProduct().getId() : null)
-                        .productName(item.getProductName()).productImage(item.getProductImage())
-                        .quantity(item.getQuantity()).unitPrice(item.getUnitPrice()).totalPrice(item.getTotalPrice())
-                        .build()).collect(Collectors.toList());
-        return OrderResponse.builder()
-                .id(order.getId()).orderNumber(order.getOrderNumber()).status(order.getStatus())
-                .paymentMethod(order.getPaymentMethod())
-                .deliveryAddress(order.getDeliveryAddress() != null ?
-                        userService.mapToAddressResponse(order.getDeliveryAddress()) : null)
-                .items(items).subtotal(order.getSubtotal()).deliveryFee(order.getDeliveryFee())
-                .packagingFee(order.getPackagingFee()).discount(order.getDiscount()).total(order.getTotal())
-                .notes(order.getNotes()).estimatedDelivery(order.getEstimatedDelivery())
-                .createdAt(order.getCreatedAt()).updatedAt(order.getUpdatedAt())
-                .customerName(order.getUser().getName()).customerPhone(order.getUser().getPhone())
-                .build();
     }
 }
