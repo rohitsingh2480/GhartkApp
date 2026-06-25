@@ -55,32 +55,5 @@ public class AdminService {
         return orderRepository.findAllByOrderByCreatedAtDesc(pageable).map(orderService::mapToResponse);
     }
 
-    @Transactional
-    public OrderResponse updateOrderStatus(Long orderId, String status) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
-        try { order.setStatus(OrderStatus.valueOf(status.toUpperCase())); }
-        catch (IllegalArgumentException e) { throw new BadRequestException("Invalid order status: " + status); }
-        return orderService.mapToResponse(orderRepository.save(order));
-    }
-
-    public Page<UserResponse> getAllUsers(int page, int size, String query) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<User> users = (query != null && !query.isEmpty())
-                ? userRepository.searchCustomers(query, pageable)
-                : userRepository.findByRole(Role.CUSTOMER, pageable);
-        return users.map(userService::mapToUserResponse);
-    }
-
-    @Transactional
-    public void toggleUserStatus(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
-        user.setActive(!user.isActive());
-        userRepository.save(user);
-    }
-
-    public List<ProductResponse> getLowStockProducts() {
-        return productService.getLowStockProducts();
-    }
+  
 }
