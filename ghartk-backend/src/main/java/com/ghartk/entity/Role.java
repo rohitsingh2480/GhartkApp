@@ -1,2 +1,2 @@
 package com.ghartk.entity;
-public enum Role { CUSTOMER, ADMIN }
+public enum Role { CUSTOMER, ADMIN, DRIVER, MERCHANT }
