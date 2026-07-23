@@ -3,6 +3,7 @@
 -- All passwords = Admin@123 (BCrypt encoded)
 -- ============================================================
 
+
 -- Users (Admin + Customers)
 INSERT IGNORE INTO users (name, email, phone, password_hash, role, is_active, is_verified, created_at, updated_at) VALUES
 ('Admin GHARTK', 'admin@ghartk.com', '9000000001', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LnLSX.knLa2', 'ADMIN', true, true, NOW(), NOW()),
