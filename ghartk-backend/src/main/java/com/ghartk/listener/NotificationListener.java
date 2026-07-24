@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class NotificationListener {
 
+    
     @Async
     @EventListener
     public void handleOrderStateChange(OrderStateChangeEvent event) {
