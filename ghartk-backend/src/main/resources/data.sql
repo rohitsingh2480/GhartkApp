@@ -3,6 +3,7 @@
 -- All passwords = Admin@123 (BCrypt encoded)
 -- ============================================================
 
+<<<<<<< Updated upstream
 
 -- Users (Admin + Customers)
 INSERT IGNORE INTO users (name, email, phone, password_hash, role, is_active, is_verified, created_at, updated_at) VALUES
@@ -12,6 +13,21 @@ INSERT IGNORE INTO users (name, email, phone, password_hash, role, is_active, is
 ('Amit Kumar', 'amit@gmail.com', '9876543212', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LnLSX.knLa2', 'CUSTOMER', true, true, NOW(), NOW()),
 ('Sneha Singh', 'sneha@gmail.com', '9876543213', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LnLSX.knLa2', 'CUSTOMER', true, true, NOW(), NOW()),
 ('Vikram Nair', 'vikram@gmail.com', '9876543214', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LnLSX.knLa2', 'CUSTOMER', true, true, NOW(), NOW());
+=======
+-- Ensure role enum supports all 4 roles (safe to re-run)
+ALTER TABLE users MODIFY COLUMN role ENUM('CUSTOMER','ADMIN','DRIVER','MERCHANT') NOT NULL DEFAULT 'CUSTOMER';
+
+-- Users (Admin + Customers + Merchant + Driver)
+INSERT IGNORE INTO users (id, name, email, phone, password_hash, role, is_active, is_verified, created_at, updated_at) VALUES
+(1, 'Admin GHARTK', 'admin@ghartk.com', '9000000001', '$2a$10$POWd.1jei9emd78ovYT9f.hNfq6ApdpGLEVt.SLh0Y/JKvAMiKYaG', 'ADMIN', true, true, NOW(), NOW()),
+(2, 'Rahul Sharma', 'rahul@gmail.com', '9876543210', '$2a$10$POWd.1jei9emd78ovYT9f.hNfq6ApdpGLEVt.SLh0Y/JKvAMiKYaG', 'CUSTOMER', true, true, NOW(), NOW()),
+(3, 'Priya Patel', 'priya@gmail.com', '9876543211', '$2a$10$POWd.1jei9emd78ovYT9f.hNfq6ApdpGLEVt.SLh0Y/JKvAMiKYaG', 'CUSTOMER', true, true, NOW(), NOW()),
+(4, 'Amit Kumar', 'amit@gmail.com', '9876543212', '$2a$10$POWd.1jei9emd78ovYT9f.hNfq6ApdpGLEVt.SLh0Y/JKvAMiKYaG', 'CUSTOMER', true, true, NOW(), NOW()),
+(5, 'Sneha Singh', 'sneha@gmail.com', '9876543213', '$2a$10$POWd.1jei9emd78ovYT9f.hNfq6ApdpGLEVt.SLh0Y/JKvAMiKYaG', 'CUSTOMER', true, true, NOW(), NOW()),
+(6, 'Vikram Nair', 'vikram@gmail.com', '9876543214', '$2a$10$POWd.1jei9emd78ovYT9f.hNfq6ApdpGLEVt.SLh0Y/JKvAMiKYaG', 'CUSTOMER', true, true, NOW(), NOW()),
+(7, 'Central Merchant', 'merchant@ghartk.com', '9000000002', '$2a$10$POWd.1jei9emd78ovYT9f.hNfq6ApdpGLEVt.SLh0Y/JKvAMiKYaG', 'MERCHANT', true, true, NOW(), NOW()),
+(8, 'Express Driver', 'driver@ghartk.com', '9000000003', '$2a$10$POWd.1jei9emd78ovYT9f.hNfq6ApdpGLEVt.SLh0Y/JKvAMiKYaG', 'DRIVER', true, true, NOW(), NOW());
+>>>>>>> Stashed changes
 
 -- Addresses
 INSERT IGNORE INTO addresses (user_id, label, line1, line2, city, state, pincode, lat, lng, is_default) VALUES
@@ -81,3 +97,14 @@ INSERT IGNORE INTO products (category_id, name, description, image_url, price, m
 (8, 'Dolo 650', 'Paracetamol IP 650mg tablets for relief from fever and pain', 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400', 29.00, 32.00, 100, '15 tabs', true, false, true, 4.6, 567, NOW(), NOW()),
 (8, 'Disprin Classic', 'Aspirin 350mg effervescent tablets for headache and fever', 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?w=400', 19.00, 22.00, 80, '10 tabs', true, false, true, 4.2, 234, NOW(), NOW()),
 (8, 'Volini Spray', 'Diclofenac diethylamine pain relief spray for muscle and joint pain', 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400', 185.00, 210.00, 40, '60g', true, false, true, 4.4, 189, NOW(), NOW());
+
+-- Stores
+INSERT IGNORE INTO stores (id, name, description, logo_url, address_line1, address_line2, city, pincode, latitude, longitude, is_active, created_at, updated_at) VALUES
+(1, 'GHARTK Central Store', 'Your hyperlocal hub for food, groceries, and more', 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200', '123 Main Street', 'Opp. Central Metro', 'Dehradun', '248001', 30.3165, 78.0322, true, NOW(), NOW());
+
+-- Drivers
+INSERT IGNORE INTO drivers (id, vehicle_type, license_plate, is_online, current_lat, current_lng, status) VALUES
+(8, 'BIKE', 'UK07AB1234', true, 30.3165, 78.0322, 'AVAILABLE');
+
+-- Link all existing products to the default central store
+UPDATE products SET store_id = 1 WHERE store_id IS NULL;
