@@ -12,6 +12,7 @@ export default function OrderDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
 
+  
   const { data, isLoading } = useQuery({
     queryKey: ['order', id],
     queryFn: () => orderAPI.getById(id),
