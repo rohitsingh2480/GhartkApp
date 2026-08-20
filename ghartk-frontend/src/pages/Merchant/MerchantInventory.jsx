@@ -8,6 +8,8 @@ export default function MerchantInventory() {
   const [loading, setLoading] = useState(true)
   const [editingStock, setEditingStock] = useState(null)
   const [stockValue, setStockValue] = useState('')
+  const [editingPrice, setEditingPrice] = useState(null)
+  const [priceValue, setPriceValue] = useState('')
 
   useEffect(() => {
     fetchProducts()
@@ -50,6 +52,22 @@ export default function MerchantInventory() {
     }
   }
 
+  const handlePriceSave = async (id) => {
+    const price = parseFloat(priceValue)
+    if (isNaN(price) || price <= 0) {
+      toast.error('Enter a valid price greater than 0')
+      return
+    }
+    try {
+      await merchantAPI.updateProductPrice(id, price)
+      toast.success('Price updated!')
+      setEditingPrice(null)
+      fetchProducts()
+    } catch {
+      toast.error('Failed to update price')
+    }
+  }
+
   return (
     <div>
       <h2 style={{ fontWeight: 700, fontSize: '1.4rem', marginBottom: 20 }}>📦 Inventory Manager</h2>
@@ -85,7 +103,36 @@ export default function MerchantInventory() {
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: '14px 16px', fontWeight: 700, color: '#0f3460' }}>₹{product.price}</td>
+                  <td style={{ padding: '14px 16px' }}>
+                    {editingPrice === product.id ? (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={priceValue}
+                          onChange={(e) => setPriceValue(e.target.value)}
+                          style={{ width: 80, padding: '5px 8px', border: '1.5px solid var(--primary)', borderRadius: 8, fontSize: '0.9rem' }}
+                          autoFocus
+                        />
+                        <button onClick={() => handlePriceSave(product.id)}
+                          style={{ background: 'var(--primary)', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                          Save
+                        </button>
+                        <button onClick={() => setEditingPrice(null)}
+                          style={{ background: '#f1f5f9', border: 'none', padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: '0.8rem' }}>
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 700, color: '#0f3460' }}>₹{product.price}</span>
+                        <button onClick={() => { setEditingPrice(product.id); setPriceValue(product.price ?? '') }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex' }}>
+                          <FiEdit3 size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </td>
                   <td style={{ padding: '14px 16px' }}>
                     {editingStock === product.id ? (
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
