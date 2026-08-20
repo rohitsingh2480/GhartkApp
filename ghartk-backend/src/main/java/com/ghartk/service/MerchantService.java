@@ -31,6 +31,13 @@ public class MerchantService {
     public Page<OrderResponse> getOrders(Long storeId, String status, Pageable pageable) {
         if (status != null && !status.trim().isEmpty()) {
             try {
+                if (status.contains(",")) {
+                    List<OrderStatus> statuses = java.util.Arrays.stream(status.split(","))
+                            .map(s -> OrderStatus.valueOf(s.trim().toUpperCase()))
+                            .collect(Collectors.toList());
+                    return orderRepository.findByStoreIdAndStatusInOrderByCreatedAtDesc(storeId, statuses, pageable)
+                            .map(orderService::mapToResponse);
+                }
                 OrderStatus orderStatus = OrderStatus.valueOf(status.toUpperCase());
                 return orderRepository.findByStoreIdAndStatusOrderByCreatedAtDesc(storeId, orderStatus, pageable)
                         .map(orderService::mapToResponse);
@@ -46,7 +53,7 @@ public class MerchantService {
     public OrderResponse updateOrderStatus(Long storeId, Long orderId, String statusStr) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
-        if (order.getStore() == null || !order.getStore().getId().equals(storeId)) {
+        if (order.getStoreId() == null || !order.getStoreId().equals(storeId)) {
             throw new BadRequestException("Order does not belong to this store");
         }
         try {
@@ -73,7 +80,7 @@ public class MerchantService {
     public ProductResponse updateProductStock(Long storeId, Long productId, Integer stockQty) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
-        if (product.getStore() == null || !product.getStore().getId().equals(storeId)) {
+        if (product.getStoreId() == null || !product.getStoreId().equals(storeId)) {
             throw new BadRequestException("Product does not belong to this store");
         }
         if (stockQty < 0) {
@@ -87,7 +94,7 @@ public class MerchantService {
     public ProductResponse toggleProductAvailability(Long storeId, Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
-        if (product.getStore() == null || !product.getStore().getId().equals(storeId)) {
+        if (product.getStoreId() == null || !product.getStoreId().equals(storeId)) {
             throw new BadRequestException("Product does not belong to this store");
         }
         product.setAvailable(!product.isAvailable());
@@ -114,7 +121,7 @@ public class MerchantService {
         
         List<ProductResponse> lowStock = productRepository.findByStockQtyLessThanAndIsAvailableTrue(10)
                 .stream()
-                .filter(p -> p.getStore() != null && p.getStore().getId().equals(storeId))
+                .filter(p -> p.getStoreId() == null || p.getStoreId().equals(storeId))
                 .map(productService::mapToResponse)
                 .collect(Collectors.toList());
                 
@@ -138,5 +145,19 @@ public class MerchantService {
                 .lowStockCount(lowStock.size())
                 .activeOrders(activeOrders)
                 .build();
+    }
+
+    @Transactional
+    public ProductResponse updateProductPrice(Long storeId, Long productId, java.math.BigDecimal price) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
+        if (product.getStoreId() == null || !product.getStoreId().equals(storeId)) {
+            throw new BadRequestException("Product does not belong to this store");
+        }
+        if (price == null || price.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Price must be greater than zero");
+        }
+        product.setPrice(price);
+        return productService.mapToResponse(productRepository.save(product));
     }
 }
