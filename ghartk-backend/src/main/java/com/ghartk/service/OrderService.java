@@ -48,6 +48,7 @@ public class OrderService {
                 .status(OrderStatus.PLACED).paymentMethod(request.getPaymentMethod())
                 .subtotal(subtotal).deliveryFee(deliveryFee).packagingFee(PACKAGING_FEE)
                 .discount(BigDecimal.ZERO).total(total).notes(request.getNotes())
+                .storeId(1L)
                 .estimatedDelivery("30-45 mins").build();
         List<OrderItem> orderItems = cart.getItems().stream().map(ci -> {
             BigDecimal itemTotal = ci.getPriceSnapshot().multiply(BigDecimal.valueOf(ci.getQuantity()));
@@ -94,6 +95,7 @@ public class OrderService {
                 .notes(order.getNotes()).estimatedDelivery(order.getEstimatedDelivery())
                 .createdAt(order.getCreatedAt()).updatedAt(order.getUpdatedAt())
                 .customerName(order.getUser().getName()).customerPhone(order.getUser().getPhone())
+                .userName(order.getUser().getName()).totalAmount(order.getTotal())
                 .build();
     }
 }
