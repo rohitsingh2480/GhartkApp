@@ -1,86 +1,101 @@
-package com.ghartk.websocket;
+package com.ghartk.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-import org.springframework.web.socket.*;
-import org.springframework.web.socket.handler.TextWebSocketHandler;
+import com.ghartk.dto.request.OrderRequest;
+import com.ghartk.dto.response.*;
+import com.ghartk.entity.*;
+import com.ghartk.exception.BadRequestException;
+import com.ghartk.exception.ResourceNotFoundException;
+import com.ghartk.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
 
-@Component
-@Slf4j
-public class LocationHandler extends TextWebSocketHandler {
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final Map<Long, Set<WebSocketSession>> orderSessions = new ConcurrentHashMap<>();
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class OrderService {
+    private final OrderRepository orderRepository;
+    private final AddressRepository addressRepository;
+    private final CartService cartService;
+    private final UserService userService;
+    private final PaymentRepository paymentRepository;
 
-    @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String query = session.getUri().getQuery();
-        if (query != null && query.contains("orderId=")) {
-            try {
-                String orderIdStr = query.split("orderId=")[1].split("&")[0];
-                Long orderId = Long.parseLong(orderIdStr);
-                orderSessions.computeIfAbsent(orderId, k -> new CopyOnWriteArraySet<>()).add(session);
-                log.info("Client connected to track order {}", orderId);
-            } catch (Exception e) {
-                log.warn("Invalid orderId in query string: {}", query);
-                session.close(CloseStatus.BAD_DATA);
-            }
-        } else {
-            log.warn("No orderId provided in connection query string");
-            session.close(CloseStatus.BAD_DATA);
-        }
+    private static final BigDecimal DELIVERY_FEE = new BigDecimal("49.00");
+    private static final BigDecimal FREE_DELIVERY_THRESHOLD = new BigDecimal("499.00");
+    private static final BigDecimal PACKAGING_FEE = new BigDecimal("10.00");
+
+    @Transactional
+    public OrderResponse placeOrder(String emailOrPhone, OrderRequest request) {
+        User user = userService.getUserEntity(emailOrPhone);
+        Cart cart = cartService.getCartEntity(emailOrPhone);
+        if (cart.getItems().isEmpty()) throw new BadRequestException("Cart is empty");
+        Address address = addressRepository.findById(request.getAddressId())
+                .filter(a -> a.getUser().getId().equals(user.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Address", request.getAddressId()));
+        BigDecimal subtotal = cart.getItems().stream()
+                .map(i -> i.getPriceSnapshot().multiply(BigDecimal.valueOf(i.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal deliveryFee = subtotal.compareTo(FREE_DELIVERY_THRESHOLD) >= 0 ? BigDecimal.ZERO : DELIVERY_FEE;
+        BigDecimal total = subtotal.add(deliveryFee).add(PACKAGING_FEE);
+        String orderNumber = "ORD" + System.currentTimeMillis();
+        Order order = Order.builder()
+                .orderNumber(orderNumber).user(user).deliveryAddress(address)
+                .status(OrderStatus.PLACED).paymentMethod(request.getPaymentMethod())
+                .subtotal(subtotal).deliveryFee(deliveryFee).packagingFee(PACKAGING_FEE)
+                .discount(BigDecimal.ZERO).total(total).notes(request.getNotes())
+                .storeId(1L)
+                .estimatedDelivery("30-45 mins").build();
+        List<OrderItem> orderItems = cart.getItems().stream().map(ci -> {
+            BigDecimal itemTotal = ci.getPriceSnapshot().multiply(BigDecimal.valueOf(ci.getQuantity()));
+            return OrderItem.builder().order(order).product(ci.getProduct())
+                    .productName(ci.getProduct().getName()).productImage(ci.getProduct().getImageUrl())
+                    .quantity(ci.getQuantity()).unitPrice(ci.getPriceSnapshot()).totalPrice(itemTotal).build();
+        }).collect(Collectors.toList());
+        order.setItems(orderItems);
+        Payment payment = Payment.builder().order(order).method(request.getPaymentMethod())
+                .status(PaymentStatus.PENDING).amount(total).build();
+        order.setPayment(payment);
+        Order saved = orderRepository.save(order);
+        cartService.clearCart(emailOrPhone);
+        return mapToResponse(saved);
     }
 
-    @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        try {
-            Map<String, Object> payload = objectMapper.readValue(message.getPayload(), Map.class);
-            if (payload.containsKey("orderId") && payload.containsKey("latitude") && payload.containsKey("longitude")) {
-                Long orderId = Long.valueOf(payload.get("orderId").toString());
-                Double lat = Double.valueOf(payload.get("latitude").toString());
-                Double lng = Double.valueOf(payload.get("longitude").toString());
-                broadcastLocation(orderId, lat, lng);
-            }
-        } catch (Exception e) {
-            log.error("Error parsing coordinate message: {}", e.getMessage());
-        }
+    public Page<OrderResponse> getMyOrders(String emailOrPhone, int page, int size) {
+        User user = userService.getUserEntity(emailOrPhone);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId(), pageable).map(this::mapToResponse);
     }
 
-    @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
-        orderSessions.forEach((orderId, sessions) -> {
-            if (sessions.remove(session)) {
-                log.info("Client disconnected from tracking order {}", orderId);
-            }
-        });
+    public OrderResponse getMyOrder(String emailOrPhone, Long orderId) {
+        User user = userService.getUserEntity(emailOrPhone);
+        Order order = orderRepository.findByIdAndUserId(orderId, user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+        return mapToResponse(order);
     }
 
-    public void broadcastLocation(Long orderId, Double latitude, Double longitude) {
-        Set<WebSocketSession> sessions = orderSessions.get(orderId);
-        if (sessions != null && !sessions.isEmpty()) {
-            Map<String, Object> msg = Map.of(
-                "orderId", orderId,
-                "latitude", latitude,
-                "longitude", longitude,
-                "timestamp", System.currentTimeMillis()
-            );
-            try {
-                String json = objectMapper.writeValueAsString(msg);
-                TextMessage textMessage = new TextMessage(json);
-                for (WebSocketSession session : sessions) {
-                    if (session.isOpen()) {
-                        session.sendMessage(textMessage);
-                    }
-                }
-            } catch (IOException e) {
-                log.error("Failed to broadcast location for order {}: {}", orderId, e.getMessage());
-            }
-        }
+    public OrderResponse mapToResponse(Order order) {
+        List<OrderItemResponse> items = order.getItems().stream().map(item ->
+                OrderItemResponse.builder().id(item.getId())
+                        .productId(item.getProduct() != null ? item.getProduct().getId() : null)
+                        .productName(item.getProductName()).productImage(item.getProductImage())
+                        .quantity(item.getQuantity()).unitPrice(item.getUnitPrice()).totalPrice(item.getTotalPrice())
+                        .build()).collect(Collectors.toList());
+        return OrderResponse.builder()
+                .id(order.getId()).orderNumber(order.getOrderNumber()).status(order.getStatus())
+                .paymentMethod(order.getPaymentMethod())
+                .deliveryAddress(order.getDeliveryAddress() != null ?
+                        userService.mapToAddressResponse(order.getDeliveryAddress()) : null)
+                .items(items).subtotal(order.getSubtotal()).deliveryFee(order.getDeliveryFee())
+                .packagingFee(order.getPackagingFee()).discount(order.getDiscount()).total(order.getTotal())
+                .notes(order.getNotes()).estimatedDelivery(order.getEstimatedDelivery())
+                .createdAt(order.getCreatedAt()).updatedAt(order.getUpdatedAt())
+                .customerName(order.getUser().getName()).customerPhone(order.getUser().getPhone())
+                .userName(order.getUser().getName()).totalAmount(order.getTotal())
+                .build();
     }
 }
