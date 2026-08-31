@@ -16,6 +16,9 @@ public class Store {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "merchant_user_id")
+    private Long merchantUserId;
+
     @Column(nullable = false, unique = true)
     private String name;
 
