@@ -15,11 +15,11 @@ public class ProductRequest {
     @NotNull @Min(0) private Integer stockQty;
     private String unit;
     @com.fasterxml.jackson.annotation.JsonProperty("isAvailable")
-    private boolean isAvailable = true;
+    private Boolean isAvailable = true;
 
     @com.fasterxml.jackson.annotation.JsonProperty("isFeatured")
-    private boolean isFeatured = false;
+    private Boolean isFeatured = false;
 
     @com.fasterxml.jackson.annotation.JsonProperty("isVeg")
-    private boolean isVeg = true;
+    private Boolean isVeg = true;
 }

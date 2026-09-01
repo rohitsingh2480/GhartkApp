@@ -35,7 +35,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/ws/track/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/categories/**", "/products/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/categories/**", "/products/**", "/stores/**").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/merchant/**").hasRole("MERCHANT")
                 .requestMatchers("/driver/**").hasRole("DRIVER")

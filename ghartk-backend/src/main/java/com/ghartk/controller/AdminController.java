@@ -113,4 +113,24 @@ public class AdminController {
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStock() {
         return ResponseEntity.ok(ApiResponse.success(adminService.getLowStockProducts()));
     }
+
+    // ── Store & Merchant Onboarding ───────────────────────────────────────
+
+    @PostMapping("/merchants")
+    public ResponseEntity<ApiResponse<StoreResponse>> onboardMerchant(
+            @RequestBody OnboardMerchantRequest req) {
+        StoreResponse store = adminService.onboardMerchantAndStore(req);
+        return ResponseEntity.ok(ApiResponse.success("Merchant & Store onboarded successfully", store));
+    }
+
+    @GetMapping("/stores")
+    public ResponseEntity<ApiResponse<List<StoreResponse>>> getAllStores() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getAllStores()));
+    }
+
+    @PutMapping("/stores/{id}/toggle-status")
+    public ResponseEntity<ApiResponse<StoreResponse>> toggleStoreStatus(@PathVariable Long id) {
+        StoreResponse store = adminService.toggleStoreStatus(id);
+        return ResponseEntity.ok(ApiResponse.success("Store status updated", store));
+    }
 }

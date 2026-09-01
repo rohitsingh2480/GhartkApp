@@ -1,5 +1,6 @@
 package com.ghartk.service;
 
+import com.ghartk.dto.request.ProductRequest;
 import com.ghartk.dto.response.*;
 import com.ghartk.entity.*;
 import com.ghartk.exception.BadRequestException;
@@ -24,9 +25,21 @@ import java.util.stream.Collectors;
 public class MerchantService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private final StoreRepository storeRepository;
+    private final CategoryRepository categoryRepository;
     private final OrderService orderService;
     private final ProductService productService;
     private final ApplicationEventPublisher eventPublisher;
+
+    // ── Store Resolution ───────────────────────────────────────────────────
+
+    public Store getStoreForMerchant(Long merchantUserId) {
+        return storeRepository.findByMerchantUserId(merchantUserId)
+                .orElseThrow(() -> new BadRequestException(
+                        "No store found for this merchant account. Please contact the Admin to onboard your store."));
+    }
+
+    // ── Orders ─────────────────────────────────────────────────────────────
 
     public Page<OrderResponse> getOrders(Long storeId, String status, Pageable pageable) {
         if (status != null && !status.trim().isEmpty()) {
@@ -60,20 +73,73 @@ public class MerchantService {
             OrderStatus status = OrderStatus.valueOf(statusStr.toUpperCase());
             order.setStatus(status);
             Order saved = orderRepository.save(order);
-            
-            // Publish OrderStateChangeEvent here
             eventPublisher.publishEvent(new OrderStateChangeEvent(saved));
-            
             return orderService.mapToResponse(saved);
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Invalid order status: " + statusStr);
         }
     }
 
+    // ── Products ───────────────────────────────────────────────────────────
+
     public Page<ProductResponse> getProducts(Long storeId, Long categoryId, String query, Pageable pageable) {
         String q = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
         return productRepository.findByStoreIdWithFilters(storeId, categoryId, q, pageable)
                 .map(productService::mapToResponse);
+    }
+
+    @Transactional
+    public ProductResponse createProduct(Long storeId, ProductRequest req) {
+        Category category = categoryRepository.findById(req.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category", req.getCategoryId()));
+        Product product = Product.builder()
+                .storeId(storeId)
+                .category(category)
+                .name(req.getName())
+                .description(req.getDescription())
+                .price(req.getPrice())
+                .mrp(req.getMrp() != null ? req.getMrp() : req.getPrice())
+                .stockQty(req.getStockQty() != null ? req.getStockQty() : 0)
+                .unit(req.getUnit())
+                .imageUrl(req.getImageUrl())
+                .isAvailable(req.getIsAvailable() != null ? req.getIsAvailable() : true)
+                .isFeatured(req.getIsFeatured() != null ? req.getIsFeatured() : false)
+                .isVeg(req.getIsVeg() != null ? req.getIsVeg() : true)
+                .build();
+        return productService.mapToResponse(productRepository.save(product));
+    }
+
+    @Transactional
+    public ProductResponse updateProduct(Long storeId, Long productId, ProductRequest req) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
+        if (product.getStoreId() == null || !product.getStoreId().equals(storeId)) {
+            throw new BadRequestException("Product does not belong to this store");
+        }
+        Category category = categoryRepository.findById(req.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category", req.getCategoryId()));
+        product.setCategory(category);
+        product.setName(req.getName());
+        if (req.getDescription() != null) product.setDescription(req.getDescription());
+        product.setPrice(req.getPrice());
+        if (req.getMrp() != null) product.setMrp(req.getMrp());
+        if (req.getStockQty() != null) product.setStockQty(req.getStockQty());
+        if (req.getUnit() != null) product.setUnit(req.getUnit());
+        if (req.getImageUrl() != null) product.setImageUrl(req.getImageUrl());
+        if (req.getIsAvailable() != null) product.setAvailable(req.getIsAvailable());
+        if (req.getIsFeatured() != null) product.setFeatured(req.getIsFeatured());
+        if (req.getIsVeg() != null) product.setVeg(req.getIsVeg());
+        return productService.mapToResponse(productRepository.save(product));
+    }
+
+    @Transactional
+    public void deleteProduct(Long storeId, Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
+        if (product.getStoreId() == null || !product.getStoreId().equals(storeId)) {
+            throw new BadRequestException("Product does not belong to this store");
+        }
+        productRepository.delete(product);
     }
 
     @Transactional
@@ -83,9 +149,7 @@ public class MerchantService {
         if (product.getStoreId() == null || !product.getStoreId().equals(storeId)) {
             throw new BadRequestException("Product does not belong to this store");
         }
-        if (stockQty < 0) {
-            throw new BadRequestException("Stock quantity cannot be negative");
-        }
+        if (stockQty < 0) throw new BadRequestException("Stock quantity cannot be negative");
         product.setStockQty(stockQty);
         return productService.mapToResponse(productRepository.save(product));
     }
@@ -101,38 +165,45 @@ public class MerchantService {
         return productService.mapToResponse(productRepository.save(product));
     }
 
+    @Transactional
+    public ProductResponse updateProductPrice(Long storeId, Long productId, BigDecimal price) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
+        if (product.getStoreId() == null || !product.getStoreId().equals(storeId)) {
+            throw new BadRequestException("Product does not belong to this store");
+        }
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Price must be greater than zero");
+        }
+        product.setPrice(price);
+        return productService.mapToResponse(productRepository.save(product));
+    }
+
+    // ── Analytics ──────────────────────────────────────────────────────────
+
     public MerchantAnalyticsResponse getAnalytics(Long storeId) {
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        
         long totalOrders = orderRepository.countByStoreId(storeId);
         long todaysOrders = orderRepository.countTodaysOrdersByStoreId(storeId, startOfDay);
         BigDecimal totalRevenue = orderRepository.getTotalRevenueByStoreId(storeId);
         BigDecimal todaysRevenue = orderRepository.getTodaysRevenueByStoreId(storeId, startOfDay);
-        
         long pendingOrders = orderRepository.countByStoreIdAndStatus(storeId, OrderStatus.PLACED) +
                              orderRepository.countByStoreIdAndStatus(storeId, OrderStatus.CONFIRMED);
         long preparingOrders = orderRepository.countByStoreIdAndStatus(storeId, OrderStatus.PREPARING);
         long completedOrders = orderRepository.countByStoreIdAndStatus(storeId, OrderStatus.DELIVERED);
-        
-        // Count products and low stock products
-        // For our single-store context, get all products belonging to storeId
         Page<Product> productsPage = productRepository.findByStoreIdWithFilters(storeId, null, null, PageRequest.of(0, 1));
         long totalProducts = productsPage.getTotalElements();
-        
         List<ProductResponse> lowStock = productRepository.findByStockQtyLessThanAndIsAvailableTrue(10)
                 .stream()
                 .filter(p -> p.getStoreId() == null || p.getStoreId().equals(storeId))
                 .map(productService::mapToResponse)
                 .collect(Collectors.toList());
-                
-        // Fetch active orders (not delivered and not cancelled)
         Pageable activeOrdersPageable = PageRequest.of(0, 10, Sort.by("createdAt").descending());
         List<OrderResponse> activeOrders = orderRepository.findByStoreIdOrderByCreatedAtDesc(storeId, activeOrdersPageable)
                 .stream()
                 .filter(o -> !o.getStatus().equals(OrderStatus.DELIVERED) && !o.getStatus().equals(OrderStatus.CANCELLED))
                 .map(orderService::mapToResponse)
                 .collect(Collectors.toList());
-
         return MerchantAnalyticsResponse.builder()
                 .totalOrders(totalOrders)
                 .todaysOrders(todaysOrders)
@@ -145,19 +216,5 @@ public class MerchantService {
                 .lowStockCount(lowStock.size())
                 .activeOrders(activeOrders)
                 .build();
-    }
-
-    @Transactional
-    public ProductResponse updateProductPrice(Long storeId, Long productId, java.math.BigDecimal price) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product", productId));
-        if (product.getStoreId() == null || !product.getStoreId().equals(storeId)) {
-            throw new BadRequestException("Product does not belong to this store");
-        }
-        if (price == null || price.compareTo(java.math.BigDecimal.ZERO) <= 0) {
-            throw new BadRequestException("Price must be greater than zero");
-        }
-        product.setPrice(price);
-        return productService.mapToResponse(productRepository.save(product));
     }
 }
