@@ -5,7 +5,6 @@ import com.ghartk.dto.request.*;
 import com.ghartk.dto.response.*;
 import com.ghartk.service.*;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,12 +15,17 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/admin")
-@RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
     private final AdminService adminService;
     private final CategoryService categoryService;
     private final ProductService productService;
+
+    public AdminController(AdminService adminService, CategoryService categoryService, ProductService productService) {
+        this.adminService = adminService;
+        this.categoryService = categoryService;
+        this.productService = productService;
+    }
 
     @GetMapping("/dashboard")
     public ResponseEntity<ApiResponse<DashboardResponse>> getDashboard() {
