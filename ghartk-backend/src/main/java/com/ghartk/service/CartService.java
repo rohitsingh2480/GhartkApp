@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
@@ -46,6 +47,15 @@ public class CartService {
         if (product.getStockQty() < request.getQuantity())
             throw new BadRequestException("Only " + product.getStockQty() + " items available in stock");
         Cart cart = getOrCreateCart(user);
+
+        // Ensure all items in the cart belong to the same local store
+        if (!cart.getItems().isEmpty() && product.getStoreId() != null) {
+            Long existingStoreId = cart.getItems().get(0).getProduct() != null ? cart.getItems().get(0).getProduct().getStoreId() : null;
+            if (existingStoreId != null && !existingStoreId.equals(product.getStoreId())) {
+                throw new BadRequestException("Your cart contains items from another store. GHARTK delivers from one local store per order to guarantee 30-minute delivery. Please complete or clear your cart first.");
+            }
+        }
+
         CartItem existing = cartItemRepository.findByCartIdAndProductId(cart.getId(), product.getId()).orElse(null);
         if (existing != null) {
             existing.setQuantity(existing.getQuantity() + request.getQuantity());

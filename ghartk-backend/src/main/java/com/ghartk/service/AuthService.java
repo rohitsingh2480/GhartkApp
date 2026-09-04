@@ -1,13 +1,14 @@
 package com.ghartk.service;
 
-
 import com.ghartk.dto.request.LoginRequest;
 import com.ghartk.dto.request.RegisterRequest;
 import com.ghartk.dto.response.AuthResponse;
+import com.ghartk.entity.Address;
 import com.ghartk.entity.RefreshToken;
 import com.ghartk.entity.Role;
 import com.ghartk.entity.User;
 import com.ghartk.exception.BadRequestException;
+import com.ghartk.repository.AddressRepository;
 import com.ghartk.repository.RefreshTokenRepository;
 import com.ghartk.repository.UserRepository;
 import com.ghartk.security.JwtTokenProvider;
@@ -17,11 +18,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
     private final UserRepository userRepository;
+    private final AddressRepository addressRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
@@ -37,6 +40,23 @@ public class AuthService {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(Role.CUSTOMER).isActive(true).isVerified(true).build();
         userRepository.save(user);
+
+        // If customer provided a pincode during registration, create their default delivery address
+        if (request.getPincode() != null && !request.getPincode().trim().isEmpty()) {
+            Address addr = Address.builder()
+                    .user(user)
+                    .label("Home")
+                    .line1(request.getAddressLine() != null && !request.getAddressLine().trim().isEmpty()
+                            ? request.getAddressLine().trim() : "Main Road")
+                    .city(request.getCity() != null && !request.getCity().trim().isEmpty()
+                            ? request.getCity().trim() : "Dehradun")
+                    .state("Uttarakhand")
+                    .pincode(request.getPincode().trim())
+                    .isDefault(true)
+                    .build();
+            addressRepository.save(addr);
+        }
+
         return generateAuthResponse(user);
     }
 
@@ -61,10 +81,25 @@ public class AuthService {
                 .expiry(LocalDateTime.now().plusSeconds(jwtTokenProvider.getRefreshExpirationMs() / 1000))
                 .isRevoked(false).build();
         refreshTokenRepository.save(refreshToken);
+
+        // Fetch default address pincode if available
+        List<Address> addresses = addressRepository.findByUserId(user.getId());
+        Address defaultAddr = addresses.stream().filter(Address::isDefault).findFirst()
+                .orElse(addresses.isEmpty() ? null : addresses.get(0));
+
         return AuthResponse.builder()
-                .accessToken(accessToken).refreshToken(refreshTokenStr).tokenType("Bearer")
-                .userId(user.getId()).name(user.getName()).email(user.getEmail())
-                .phone(user.getPhone()).role(user.getRole()).profileImage(user.getProfileImage()).build();
+                .accessToken(accessToken)
+                .refreshToken(refreshTokenStr)
+                .tokenType("Bearer")
+                .userId(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .role(user.getRole())
+                .profileImage(user.getProfileImage())
+                .defaultPincode(defaultAddr != null ? defaultAddr.getPincode() : null)
+                .defaultCity(defaultAddr != null ? defaultAddr.getCity() : null)
+                .build();
     }
 
     @Transactional
@@ -80,7 +115,11 @@ public class AuthService {
 
     @Transactional
     public void logout(String refreshTokenStr) {
-        refreshTokenRepository.findByTokenAndIsRevokedFalse(refreshTokenStr)
-                .ifPresent(t -> { t.setRevoked(true); refreshTokenRepository.save(t); });
+        if (refreshTokenStr != null && !refreshTokenStr.trim().isEmpty()) {
+            refreshTokenRepository.findByTokenAndIsRevokedFalse(refreshTokenStr).ifPresent(token -> {
+                token.setRevoked(true);
+                refreshTokenRepository.save(token);
+            });
+        }
     }
 }

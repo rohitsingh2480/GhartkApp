@@ -24,6 +24,7 @@ public class OrderService {
     private final CartService cartService;
     private final UserService userService;
     private final PaymentRepository paymentRepository;
+    private final StoreRepository storeRepository;
 
     private static final BigDecimal DELIVERY_FEE = new BigDecimal("49.00");
     private static final BigDecimal FREE_DELIVERY_THRESHOLD = new BigDecimal("499.00");
@@ -37,6 +38,26 @@ public class OrderService {
         Address address = addressRepository.findById(request.getAddressId())
                 .filter(a -> a.getUser().getId().equals(user.getId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Address", request.getAddressId()));
+
+        // Resolve store dynamically from items in cart
+        Long resolvedStoreId = cart.getItems().stream()
+                .map(i -> i.getProduct() != null ? i.getProduct().getStoreId() : null)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(1L);
+
+        // Validate local delivery: Check if store services the delivery address pincode
+        if (resolvedStoreId != null) {
+            storeRepository.findById(resolvedStoreId).ifPresent(store -> {
+                if (store.getPincode() != null && address.getPincode() != null
+                        && !store.getPincode().trim().equalsIgnoreCase(address.getPincode().trim())) {
+                    throw new BadRequestException("Local Delivery Notice: Store '" + store.getName() + "' operates in pincode "
+                            + store.getPincode() + " and cannot deliver to address pincode " + address.getPincode()
+                            + ". Please select an address in pincode " + store.getPincode() + ".");
+                }
+            });
+        }
+
         BigDecimal subtotal = cart.getItems().stream()
                 .map(i -> i.getPriceSnapshot().multiply(BigDecimal.valueOf(i.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -48,7 +69,7 @@ public class OrderService {
                 .status(OrderStatus.PLACED).paymentMethod(request.getPaymentMethod())
                 .subtotal(subtotal).deliveryFee(deliveryFee).packagingFee(PACKAGING_FEE)
                 .discount(BigDecimal.ZERO).total(total).notes(request.getNotes())
-                .storeId(1L)
+                .storeId(resolvedStoreId)
                 .estimatedDelivery("30-45 mins").build();
         List<OrderItem> orderItems = cart.getItems().stream().map(ci -> {
             BigDecimal itemTotal = ci.getPriceSnapshot().multiply(BigDecimal.valueOf(ci.getQuantity()));
@@ -95,7 +116,6 @@ public class OrderService {
                 .notes(order.getNotes()).estimatedDelivery(order.getEstimatedDelivery())
                 .createdAt(order.getCreatedAt()).updatedAt(order.getUpdatedAt())
                 .customerName(order.getUser().getName()).customerPhone(order.getUser().getPhone())
-                .userName(order.getUser().getName()).totalAmount(order.getTotal())
                 .build();
     }
 }

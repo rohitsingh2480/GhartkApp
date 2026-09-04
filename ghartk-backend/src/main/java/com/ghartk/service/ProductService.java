@@ -1,13 +1,14 @@
 package com.ghartk.service;
 
-
 import com.ghartk.dto.request.ProductRequest;
 import com.ghartk.dto.response.ProductResponse;
 import com.ghartk.entity.Category;
 import com.ghartk.entity.Product;
+import com.ghartk.entity.Store;
 import com.ghartk.exception.ResourceNotFoundException;
 import com.ghartk.repository.CategoryRepository;
 import com.ghartk.repository.ProductRepository;
+import com.ghartk.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
@@ -22,8 +23,9 @@ import java.util.stream.Collectors;
 public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final StoreRepository storeRepository;
 
-    public Page<ProductResponse> getProducts(Long categoryId, String query, int page, int size, String sortBy) {
+    public Page<ProductResponse> getProducts(String pincode, Long storeId, Long categoryId, String query, int page, int size, String sortBy) {
         Sort sort = switch (sortBy != null ? sortBy : "") {
             case "price_asc" -> Sort.by("price").ascending();
             case "price_desc" -> Sort.by("price").descending();
@@ -32,7 +34,16 @@ public class ProductService {
         };
         Pageable pageable = PageRequest.of(page, size, sort);
         String q = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
+        String pin = (pincode != null && !pincode.trim().isEmpty()) ? pincode.trim() : null;
+
+        if (pin != null || storeId != null) {
+            return productRepository.findCustomerProducts(pin, storeId, categoryId, q, pageable).map(this::mapToResponse);
+        }
         return productRepository.findWithFilters(categoryId, q, pageable).map(this::mapToResponse);
+    }
+
+    public Page<ProductResponse> getProducts(Long categoryId, String query, int page, int size, String sortBy) {
+        return getProducts(null, null, categoryId, query, page, size, sortBy);
     }
 
     public ProductResponse getProductById(Long id) {
@@ -40,7 +51,12 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id)));
     }
 
-    public List<ProductResponse> getFeaturedProducts() {
+    public List<ProductResponse> getFeaturedProducts(String pincode, Long storeId) {
+        String pin = (pincode != null && !pincode.trim().isEmpty()) ? pincode.trim() : null;
+        if (pin != null || storeId != null) {
+            return productRepository.findCustomerFeaturedProducts(pin, storeId)
+                    .stream().map(this::mapToResponse).collect(Collectors.toList());
+        }
         return productRepository.findByIsFeaturedTrueAndIsAvailableTrue()
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
@@ -85,11 +101,27 @@ public class ProductService {
     }
 
     public ProductResponse mapToResponse(Product p) {
+        Store store = p.getStoreId() != null ? storeRepository.findById(p.getStoreId()).orElse(null) : null;
         return ProductResponse.builder()
-                .id(p.getId()).categoryId(p.getCategory().getId()).categoryName(p.getCategory().getName())
-                .name(p.getName()).description(p.getDescription()).imageUrl(p.getImageUrl())
-                .price(p.getPrice()).mrp(p.getMrp()).stockQty(p.getStockQty()).unit(p.getUnit())
-                .isAvailable(p.isAvailable()).isFeatured(p.isFeatured()).isVeg(p.isVeg())
-                .rating(p.getRating()).reviewCount(p.getReviewCount()).createdAt(p.getCreatedAt()).build();
+                .id(p.getId())
+                .storeId(p.getStoreId())
+                .storeName(store != null ? store.getName() : "GHARTK Store")
+                .storePincode(store != null ? store.getPincode() : null)
+                .categoryId(p.getCategory().getId())
+                .categoryName(p.getCategory().getName())
+                .name(p.getName())
+                .description(p.getDescription())
+                .imageUrl(p.getImageUrl())
+                .price(p.getPrice())
+                .mrp(p.getMrp())
+                .stockQty(p.getStockQty())
+                .unit(p.getUnit())
+                .isAvailable(p.isAvailable())
+                .isFeatured(p.isFeatured())
+                .isVeg(p.isVeg())
+                .rating(p.getRating())
+                .reviewCount(p.getReviewCount())
+                .createdAt(p.getCreatedAt())
+                .build();
     }
 }

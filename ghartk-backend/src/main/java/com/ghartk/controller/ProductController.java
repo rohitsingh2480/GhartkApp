@@ -17,17 +17,22 @@ public class ProductController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ProductResponse>>> getProducts(
+            @RequestParam(required = false) String pincode,
+            @RequestParam(required = false) Long storeId,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
             @RequestParam(required = false) String sortBy) {
-        return ResponseEntity.ok(ApiResponse.success(productService.getProducts(categoryId, query, page, size, sortBy)));
+        return ResponseEntity.ok(ApiResponse.success(
+                productService.getProducts(pincode, storeId, categoryId, query, page, size, sortBy)));
     }
 
     @GetMapping("/featured")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getFeatured() {
-        return ResponseEntity.ok(ApiResponse.success(productService.getFeaturedProducts()));
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> getFeatured(
+            @RequestParam(required = false) String pincode,
+            @RequestParam(required = false) Long storeId) {
+        return ResponseEntity.ok(ApiResponse.success(productService.getFeaturedProducts(pincode, storeId)));
     }
 
     @GetMapping("/{id}")
