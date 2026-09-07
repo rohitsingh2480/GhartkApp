@@ -31,6 +31,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                                        @Param("q") String query,
                                        Pageable pageable);
 
+    @Query("SELECT p FROM Product p JOIN Store s ON p.storeId = s.id WHERE p.isAvailable = true AND s.isActive = true AND p.isFeatured = true " +
+           "AND (:pincode IS NULL OR s.pincode = :pincode) " +
+           "AND (:storeId IS NULL OR p.storeId = :storeId)")
+    List<Product> findCustomerFeaturedProducts(@Param("pincode") String pincode,
+                                               @Param("storeId") Long storeId);
+
     List<Product> findByStockQtyLessThanAndIsAvailableTrue(Integer threshold);
     long countByIsAvailableTrue();
 
