@@ -11,6 +11,10 @@ const useAuthStore = create(
 
       login: (data) => {
         localStorage.setItem('ghartk_token', data.accessToken);
+        if (data.defaultPincode) {
+          localStorage.setItem('ghartk_pincode', data.defaultPincode);
+          if (data.defaultCity) localStorage.setItem('ghartk_city', data.defaultCity);
+        }
         set({
           user: {
             id: data.userId,
@@ -19,6 +23,8 @@ const useAuthStore = create(
             phone: data.phone,
             role: data.role,
             profileImage: data.profileImage,
+            defaultPincode: data.defaultPincode,
+            defaultCity: data.defaultCity,
           },
           token: data.accessToken,
           refreshToken: data.refreshToken,
