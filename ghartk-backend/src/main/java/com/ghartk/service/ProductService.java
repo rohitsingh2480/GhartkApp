@@ -54,8 +54,17 @@ public class ProductService {
     public List<ProductResponse> getFeaturedProducts(String pincode, Long storeId) {
         String pin = (pincode != null && !pincode.trim().isEmpty()) ? pincode.trim() : null;
         if (pin != null || storeId != null) {
-            return productRepository.findCustomerFeaturedProducts(pin, storeId)
+            List<ProductResponse> featured = productRepository.findCustomerFeaturedProducts(pin, storeId)
                     .stream().map(this::mapToResponse).collect(Collectors.toList());
+            if (!featured.isEmpty()) {
+                return featured;
+            }
+            // Fallback: If no products in this pincode are explicitly tagged 'featured',
+            // return the available products for this pincode so the home showcase is never blank
+            Pageable topPicks = PageRequest.of(0, 8, Sort.by("createdAt").descending());
+            return productRepository.findCustomerProducts(pin, storeId, null, null, topPicks)
+                    .map(this::mapToResponse)
+                    .getContent();
         }
         return productRepository.findByIsFeaturedTrueAndIsAvailableTrue()
                 .stream().map(this::mapToResponse).collect(Collectors.toList());

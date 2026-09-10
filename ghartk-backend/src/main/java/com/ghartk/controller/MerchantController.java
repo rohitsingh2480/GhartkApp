@@ -5,6 +5,7 @@ import com.ghartk.dto.request.ProductRequest;
 import com.ghartk.dto.response.*;
 import com.ghartk.entity.Store;
 import com.ghartk.entity.User;
+import com.ghartk.security.CustomUserDetailsService;
 import com.ghartk.service.MerchantService;
 import com.ghartk.service.StoreService;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.data.domain.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -24,11 +26,17 @@ import java.util.Map;
 public class MerchantController {
     private final MerchantService merchantService;
     private final StoreService storeService;
+    private final CustomUserDetailsService customUserDetailsService;
+
+    private User getAuthenticatedUser(UserDetails ud) {
+        return customUserDetailsService.loadUserEntityByEmailOrPhone(ud.getUsername());
+    }
 
     // ── Store Info ─────────────────────────────────────────────────────────
 
     @GetMapping("/store")
-    public ResponseEntity<ApiResponse<StoreResponse>> getMyStore(@AuthenticationPrincipal User user) {
+    public ResponseEntity<ApiResponse<StoreResponse>> getMyStore(@AuthenticationPrincipal UserDetails ud) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         return ResponseEntity.ok(ApiResponse.success(storeService.mapToResponse(store)));
     }
@@ -37,10 +45,11 @@ public class MerchantController {
 
     @GetMapping("/orders")
     public ResponseEntity<ApiResponse<Page<OrderResponse>>> getOrders(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal UserDetails ud,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "15") int size,
             @RequestParam(required = false) String status) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return ResponseEntity.ok(ApiResponse.success(merchantService.getOrders(store.getId(), status, pageable)));
@@ -48,9 +57,10 @@ public class MerchantController {
 
     @PutMapping("/orders/{id}/status")
     public ResponseEntity<ApiResponse<OrderResponse>> updateOrderStatus(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal UserDetails ud,
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         return ResponseEntity.ok(ApiResponse.success("Order status updated",
                 merchantService.updateOrderStatus(store.getId(), id, body.get("status"))));
@@ -60,11 +70,12 @@ public class MerchantController {
 
     @GetMapping("/products")
     public ResponseEntity<ApiResponse<Page<ProductResponse>>> getProducts(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal UserDetails ud,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String query) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         return ResponseEntity.ok(ApiResponse.success(merchantService.getProducts(store.getId(), categoryId, query, pageable)));
@@ -72,8 +83,9 @@ public class MerchantController {
 
     @PostMapping("/products")
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal UserDetails ud,
             @RequestBody ProductRequest req) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         return ResponseEntity.ok(ApiResponse.success("Product added to store catalog",
                 merchantService.createProduct(store.getId(), req)));
@@ -81,9 +93,10 @@ public class MerchantController {
 
     @PutMapping("/products/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal UserDetails ud,
             @PathVariable Long id,
             @RequestBody ProductRequest req) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         return ResponseEntity.ok(ApiResponse.success("Product updated",
                 merchantService.updateProduct(store.getId(), id, req)));
@@ -91,8 +104,9 @@ public class MerchantController {
 
     @DeleteMapping("/products/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal UserDetails ud,
             @PathVariable Long id) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         merchantService.deleteProduct(store.getId(), id);
         return ResponseEntity.ok(ApiResponse.success("Product removed from store", null));
@@ -100,9 +114,10 @@ public class MerchantController {
 
     @PutMapping("/products/{id}/stock")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProductStock(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal UserDetails ud,
             @PathVariable Long id,
             @RequestBody Map<String, Integer> body) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         return ResponseEntity.ok(ApiResponse.success("Stock updated",
                 merchantService.updateProductStock(store.getId(), id, body.get("stockQty"))));
@@ -110,9 +125,10 @@ public class MerchantController {
 
     @PutMapping("/products/{id}/price")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProductPrice(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal UserDetails ud,
             @PathVariable Long id,
             @RequestBody Map<String, Object> body) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         BigDecimal price = new BigDecimal(body.get("price").toString());
         return ResponseEntity.ok(ApiResponse.success("Price updated",
@@ -121,8 +137,9 @@ public class MerchantController {
 
     @PutMapping("/products/{id}/toggle-availability")
     public ResponseEntity<ApiResponse<ProductResponse>> toggleProductAvailability(
-            @AuthenticationPrincipal User user,
+            @AuthenticationPrincipal UserDetails ud,
             @PathVariable Long id) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         return ResponseEntity.ok(ApiResponse.success("Availability updated",
                 merchantService.toggleProductAvailability(store.getId(), id)));
@@ -132,7 +149,8 @@ public class MerchantController {
 
     @GetMapping("/analytics")
     public ResponseEntity<ApiResponse<MerchantAnalyticsResponse>> getAnalytics(
-            @AuthenticationPrincipal User user) {
+            @AuthenticationPrincipal UserDetails ud) {
+        User user = getAuthenticatedUser(ud);
         Store store = merchantService.getStoreForMerchant(user.getId());
         return ResponseEntity.ok(ApiResponse.success(merchantService.getAnalytics(store.getId())));
     }
