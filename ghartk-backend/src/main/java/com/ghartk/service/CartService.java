@@ -22,6 +22,8 @@ public class CartService {
     private final CartItemRepository cartItemRepository;
     private final ProductRepository productRepository;
     private final UserService userService;
+    private final StoreRepository storeRepository;
+    private final AddressRepository addressRepository;
 
     private static final BigDecimal DELIVERY_FEE = new BigDecimal("49.00");
     private static final BigDecimal FREE_DELIVERY_THRESHOLD = new BigDecimal("499.00");
@@ -46,6 +48,28 @@ public class CartService {
         if (!product.isAvailable()) throw new BadRequestException("Product is currently unavailable");
         if (product.getStockQty() < request.getQuantity())
             throw new BadRequestException("Only " + product.getStockQty() + " items available in stock");
+
+        // Validate that buyer can only order from merchants operating in their delivery pincode
+        if (product.getStoreId() != null) {
+            storeRepository.findById(product.getStoreId()).ifPresent(store -> {
+                String storePincode = store.getPincode() != null ? store.getPincode().trim() : null;
+                if (storePincode != null) {
+                    // Check if buyer has any address matching this store's pincode
+                    List<Address> addresses = addressRepository.findByUserId(user.getId());
+                    if (!addresses.isEmpty()) {
+                        boolean hasMatchingAddress = addresses.stream()
+                                .anyMatch(a -> a.getPincode() != null && a.getPincode().trim().equalsIgnoreCase(storePincode));
+                        if (!hasMatchingAddress) {
+                            String userPins = addresses.stream().map(Address::getPincode).filter(java.util.Objects::nonNull).collect(Collectors.joining(", "));
+                            throw new BadRequestException("This merchant ('" + store.getName() + "') only delivers to pincode "
+                                    + storePincode + ". Your registered address is in " + userPins
+                                    + ". You cannot purchase from vendors outside your delivery area.");
+                        }
+                    }
+                }
+            });
+        }
+
         Cart cart = getOrCreateCart(user);
 
         // Ensure all items in the cart belong to the same local store
