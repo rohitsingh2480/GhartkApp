@@ -3,7 +3,6 @@ package com.ghartk.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -11,8 +10,8 @@ import java.security.Key;
 import java.util.Date;
 
 @Component
-@Slf4j
 public class JwtTokenProvider {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(JwtTokenProvider.class);
     @Value("${app.jwt.secret}") private String jwtSecret;
     @Value("${app.jwt.expiration}") private long jwtExpiration;
     @Value("${app.jwt.refresh-expiration}") private long refreshExpiration;
