@@ -79,7 +79,25 @@ export default function ProductCard({ product }) {
       </div>
 
       <div className="product-card-body">
-        <div className="product-card-category">{product.categoryName}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, gap: 4 }}>
+          <span className="product-card-category">{product.categoryName}</span>
+          {product.storeName && (
+            <span style={{
+              fontSize: '0.68rem',
+              fontWeight: 600,
+              color: '#0f3460',
+              background: 'rgba(15,52,96,0.08)',
+              padding: '2px 6px',
+              borderRadius: 4,
+              maxWidth: 130,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }} title={`Store: ${product.storeName} (${product.storePincode || ''})`}>
+              🏪 {product.storeName}
+            </span>
+          )}
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
           <div className={`veg-indicator ${product.isVeg ? 'veg' : 'non-veg'}`} />
           <div className="product-card-name">{product.name}</div>
