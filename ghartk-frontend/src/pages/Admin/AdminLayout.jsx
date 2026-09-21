@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { MdDeliveryDining } from 'react-icons/md'
+import { MdDeliveryDining, MdStorefront, MdTwoWheeler } from 'react-icons/md'
 import { FiGrid, FiShoppingBag, FiBox, FiTag, FiUsers, FiLogOut, FiHome } from 'react-icons/fi'
 import useAuthStore from '../../store/authStore'
 import toast from 'react-hot-toast'
@@ -7,6 +7,8 @@ import toast from 'react-hot-toast'
 const navItems = [
   { path: '/admin', icon: <FiGrid />, label: 'Dashboard', end: true },
   { path: '/admin/orders', icon: <FiShoppingBag />, label: 'Orders' },
+  { path: '/admin/vendors', icon: <MdStorefront />, label: 'Vendors & Stores' },
+  { path: '/admin/drivers', icon: <MdTwoWheeler />, label: 'Delivery Partners' },
   { path: '/admin/products', icon: <FiBox />, label: 'Products' },
   { path: '/admin/categories', icon: <FiTag />, label: 'Categories' },
   { path: '/admin/users', icon: <FiUsers />, label: 'Customers' },
