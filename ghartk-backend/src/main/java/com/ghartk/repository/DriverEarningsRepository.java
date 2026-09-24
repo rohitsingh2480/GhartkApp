@@ -1,6 +1,5 @@
 package com.ghartk.repository;
 
-
 import com.ghartk.entity.DriverEarnings;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -8,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -16,4 +16,7 @@ public interface DriverEarningsRepository extends JpaRepository<DriverEarnings, 
     
     @Query("SELECT COALESCE(SUM(de.baseFare + de.tip), 0) FROM DriverEarnings de WHERE de.driver.id = :driverId")
     BigDecimal getTotalEarningsByDriverId(@Param("driverId") Long driverId);
+
+    @Query("SELECT COALESCE(SUM(de.baseFare + de.tip), 0) FROM DriverEarnings de WHERE de.driver.id = :driverId AND de.earnedAt >= :startOfDay")
+    BigDecimal getTodaysEarningsByDriverId(@Param("driverId") Long driverId, @Param("startOfDay") LocalDateTime startOfDay);
 }
