@@ -1,5 +1,6 @@
 package com.ghartk.service;
 
+import com.ghartk.dto.request.OnboardDriverRequest;
 import com.ghartk.dto.request.OnboardMerchantRequest;
 import com.ghartk.dto.response.*;
 import com.ghartk.entity.*;
@@ -12,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,6 +27,9 @@ public class AdminService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final StoreRepository storeRepository;
+    private final DriverRepository driverRepository;
+    private final DeliveryRepository deliveryRepository;
+    private final DriverEarningsRepository driverEarningsRepository;
     private final OrderService orderService;
     private final UserService userService;
     private final ProductService productService;
@@ -142,5 +147,90 @@ public class AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Store", storeId));
         store.setActive(!store.isActive());
         return storeService.mapToResponse(storeRepository.save(store));
+    }
+
+    // ── Driver Onboarding & Management ─────────────────────────────────────
+
+    @Transactional
+    public DriverResponse onboardDriver(OnboardDriverRequest req) {
+        if (userRepository.existsByEmail(req.getEmail())) {
+            throw new BadRequestException("A user with this email already exists: " + req.getEmail());
+        }
+        if (userRepository.existsByPhone(req.getPhone())) {
+            throw new BadRequestException("A user with this phone number already exists: " + req.getPhone());
+        }
+
+        // 1. Create User with DRIVER role
+        User user = User.builder()
+                .name(req.getName())
+                .email(req.getEmail())
+                .phone(req.getPhone())
+                .password(passwordEncoder.encode(req.getPassword()))
+                .role(Role.DRIVER)
+                .isActive(true)
+                .isVerified(true)
+                .build();
+        user = userRepository.save(user);
+
+        // 2. Create Driver profile
+        String vehicleType = req.getVehicleType() != null ? req.getVehicleType().toUpperCase() : "BIKE";
+        String plate = req.getLicensePlate();
+        if (plate == null || plate.isBlank()) {
+            plate = "CYCLE".equalsIgnoreCase(vehicleType) ? "BICYCLE" : "NA";
+        } else {
+            plate = plate.trim().toUpperCase();
+        }
+
+        Driver driver = Driver.builder()
+                .user(user)
+                .vehicleType(vehicleType)
+                .licensePlate(plate)
+                .isOnline(false)
+                .status("AVAILABLE")
+                .build();
+        driver = driverRepository.save(driver);
+
+        return mapToDriverResponse(driver);
+    }
+
+    public List<DriverResponse> getAllDrivers() {
+        return driverRepository.findAll().stream()
+                .map(this::mapToDriverResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public DriverResponse toggleDriverStatus(Long driverId) {
+        Driver driver = driverRepository.findById(driverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Driver", driverId));
+        User user = driver.getUser();
+        user.setActive(!user.isActive());
+        userRepository.save(user);
+        return mapToDriverResponse(driver);
+    }
+
+    private DriverResponse mapToDriverResponse(Driver driver) {
+        User user = driver.getUser();
+        BigDecimal totalEarnings = driverEarningsRepository.getTotalEarningsByDriverId(driver.getId());
+        long totalDeliveries = deliveryRepository.findByDriverIdOrderByAssignedAtDesc(driver.getId()).stream()
+                .filter(d -> "DELIVERED".equals(d.getStatus()))
+                .count();
+
+        return DriverResponse.builder()
+                .id(driver.getId())
+                .name(user != null ? user.getName() : "Driver")
+                .email(user != null ? user.getEmail() : "")
+                .phone(user != null ? user.getPhone() : "")
+                .vehicleType(driver.getVehicleType())
+                .licensePlate(driver.getLicensePlate())
+                .isOnline(driver.isOnline())
+                .status(driver.getStatus())
+                .currentLat(driver.getCurrentLat())
+                .currentLng(driver.getCurrentLng())
+                .totalEarnings(totalEarnings != null ? totalEarnings : BigDecimal.ZERO)
+                .totalDeliveries(totalDeliveries)
+                .isActive(user != null && user.isActive())
+                .createdAt(user != null ? user.getCreatedAt() : LocalDateTime.now())
+                .build();
     }
 }

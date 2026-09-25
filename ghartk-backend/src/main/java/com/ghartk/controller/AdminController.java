@@ -137,4 +137,23 @@ public class AdminController {
         StoreResponse store = adminService.toggleStoreStatus(id);
         return ResponseEntity.ok(ApiResponse.success("Store status updated", store));
     }
+
+    // ── Driver Onboarding & Management ─────────────────────────────────────
+
+    @PostMapping("/drivers")
+    public ResponseEntity<ApiResponse<DriverResponse>> onboardDriver(@Valid @RequestBody OnboardDriverRequest req) {
+        DriverResponse driver = adminService.onboardDriver(req);
+        return ResponseEntity.ok(ApiResponse.success("Driver partner onboarded successfully", driver));
+    }
+
+    @GetMapping("/drivers")
+    public ResponseEntity<ApiResponse<List<DriverResponse>>> getAllDrivers() {
+        return ResponseEntity.ok(ApiResponse.success(adminService.getAllDrivers()));
+    }
+
+    @PutMapping("/drivers/{id}/toggle-status")
+    public ResponseEntity<ApiResponse<DriverResponse>> toggleDriverStatus(@PathVariable Long id) {
+        DriverResponse driver = adminService.toggleDriverStatus(id);
+        return ResponseEntity.ok(ApiResponse.success("Driver status updated", driver));
+    }
 }
